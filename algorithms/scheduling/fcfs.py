@@ -35,10 +35,11 @@ class FCFS(SchedulingAlgorithm):
         return ready_queue[0]
 
     def on_tick(
-        self,
-        current_process: Optional[Process],
-        current_tick: int,
-    ) -> bool:
+            self, 
+            current_process, 
+            current_tick, 
+            ready_queue=None
+        ) -> bool:
         # Non-preemptive: asla preempt etme
         return False
 

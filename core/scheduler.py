@@ -80,10 +80,12 @@ class SchedulingAlgorithm(ABC):
 
     @abstractmethod
     def on_tick(
-        self,
-        current_process: Optional[Process],
-        current_tick: int,
-    ) -> bool:
+        self, 
+        current_process, 
+        current_tick, 
+        ready_queue=None
+        ) -> bool:
+        
         """
         Her tick'te çağrılır. Preemption kararı verir.
 
