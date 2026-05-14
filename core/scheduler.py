@@ -143,7 +143,7 @@ class Scheduler:
 
         # 2. Preemption kontrolü
         if self.current_process is not None:
-            should_preempt = self.algorithm.on_tick(self.current_process, current_tick)
+            should_preempt = self.algorithm.on_tick(self.current_process, current_tick, self.ready_queue)
             if should_preempt:
                 self.current_process.transition_to(ProcessState.READY)
                 self.ready_queue.appendleft(self.current_process)

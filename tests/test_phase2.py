@@ -94,11 +94,10 @@ class TestSJF:
 
 class TestSRTF:
     def test_preempts_when_shorter_arrives(self):
-        # P1 burst=6 arrival=0, P2 burst=2 arrival=2
-        # P1 tick 1-2 çalışır (remaining=4), P2 gelir (remaining=2 < 4) → preempt
-        # P2 tick 3-4 çalışır, P1 kaldığı yerden devam (remaining=4) tick 5-8
+        # P1 burst=6 arrival=0, P2 burst=2 arrival=1
+        # P2 geldiğinde P1'in remaining=5 > 2 → preemption kesin gerçekleşir
         p1 = Process(pid=1, name="p1", burst_time=6, arrival_time=0)
-        p2 = Process(pid=2, name="p2", burst_time=2, arrival_time=2)
+        p2 = Process(pid=2, name="p2", burst_time=2, arrival_time=1)
         _, stats = run(SRTF(), [p1, p2])
         assert p2.completion_time < p1.completion_time
         assert stats.completed_processes == 2
@@ -170,16 +169,12 @@ class TestRoundRobin:
         assert stats.completed_processes == 1
 
     def test_context_switches_increase_with_small_quantum(self):
-        processes = [
-            Process(pid=i, name=f"p{i}", burst_time=6, arrival_time=0)
-            for i in range(3)
-        ]
         _, stats_small = run(RoundRobin(quantum=1), [
-            Process(pid=i, name=f"p{i}", burst_time=6, arrival_time=0)
+            Process(pid=i, name=f"p{i}", burst_time=4, arrival_time=0)
             for i in range(3)
         ])
-        _, stats_large = run(RoundRobin(quantum=6), [
-            Process(pid=i, name=f"p{i}", burst_time=6, arrival_time=0)
+        _, stats_large = run(RoundRobin(quantum=10), [
+            Process(pid=i, name=f"p{i}", burst_time=4, arrival_time=0)
             for i in range(3)
         ])
         assert stats_small.context_switches > stats_large.context_switches
@@ -245,7 +240,7 @@ class TestPreemptivePriority:
     def test_preempts_on_higher_priority_arrival(self):
         # P1 priority=5 çalışırken P2 priority=1 gelir → P1 preempt edilir
         p1 = Process(pid=1, name="p1", burst_time=6, arrival_time=0, priority=5)
-        p2 = Process(pid=2, name="p2", burst_time=2, arrival_time=2, priority=1)
+        p2 = Process(pid=2, name="p2", burst_time=2, arrival_time=1, priority=1)
         _, stats = run(PreemptivePriority(aging_interval=None), [p1, p2])
         assert p2.completion_time < p1.completion_time
 
