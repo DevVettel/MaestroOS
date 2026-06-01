@@ -1,0 +1,19 @@
+{
+  "name": "Memory Stress Demo",
+  "algorithm": "SJF",
+  "quantum": 3,
+  "memory_size": 256,
+  "memory_strategy": "BEST_FIT",
+  "processes": [
+    {"pid": 1,  "name": "P1",  "burst_time": 4,  "arrival_time": 0, "priority": 1},
+    {"pid": 2,  "name": "P2",  "burst_time": 7,  "arrival_time": 0, "priority": 2},
+    {"pid": 3,  "name": "P3",  "burst_time": 3,  "arrival_time": 1, "priority": 3},
+    {"pid": 4,  "name": "P4",  "burst_time": 9,  "arrival_time": 1, "priority": 1},
+    {"pid": 5,  "name": "P5",  "burst_time": 5,  "arrival_time": 2, "priority": 2},
+    {"pid": 6,  "name": "P6",  "burst_time": 6,  "arrival_time": 2, "priority": 4},
+    {"pid": 7,  "name": "P7",  "burst_time": 11, "arrival_time": 3, "priority": 1},
+    {"pid": 8,  "name": "P8",  "burst_time": 4,  "arrival_time": 3, "priority": 3},
+    {"pid": 9,  "name": "P9",  "burst_time": 8,  "arrival_time": 4, "priority": 2},
+    {"pid": 10, "name": "P10", "burst_time": 13, "arrival_time": 5, "priority": 5}
+  ]
+}

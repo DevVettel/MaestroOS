@@ -1,0 +1,15 @@
+{
+  "name": "Round Robin Demo",
+  "algorithm": "RoundRobin",
+  "quantum": 3,
+  "memory_size": 1024,
+  "memory_strategy": "BEST_FIT",
+  "processes": [
+    {"pid": 1, "name": "Chrome",  "burst_time": 20, "arrival_time": 0, "priority": 2},
+    {"pid": 2, "name": "VSCode",  "burst_time": 5,  "arrival_time": 1, "priority": 1},
+    {"pid": 3, "name": "Firefox", "burst_time": 14, "arrival_time": 2, "priority": 3},
+    {"pid": 4, "name": "Python",  "burst_time": 9,  "arrival_time": 3, "priority": 1},
+    {"pid": 5, "name": "Node",    "burst_time": 3,  "arrival_time": 4, "priority": 2},
+    {"pid": 6, "name": "Docker",  "burst_time": 18, "arrival_time": 5, "priority": 4}
+  ]
+}

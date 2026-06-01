@@ -1,0 +1,16 @@
+{
+  "name": "Deadlock Demo (High Priority)",
+  "algorithm": "Priority",
+  "quantum": 4,
+  "memory_size": 2048,
+  "memory_strategy": "FIRST_FIT",
+  "processes": [
+    {"pid": 1, "name": "Kernel",   "burst_time": 5,  "arrival_time": 0, "priority": 1},
+    {"pid": 2, "name": "IRQ",      "burst_time": 3,  "arrival_time": 0, "priority": 1},
+    {"pid": 3, "name": "SysCall",  "burst_time": 8,  "arrival_time": 1, "priority": 1},
+    {"pid": 4, "name": "Driver",   "burst_time": 6,  "arrival_time": 1, "priority": 2},
+    {"pid": 5, "name": "Daemon",   "burst_time": 10, "arrival_time": 2, "priority": 2},
+    {"pid": 6, "name": "App",      "burst_time": 15, "arrival_time": 2, "priority": 3},
+    {"pid": 7, "name": "Worker",   "burst_time": 20, "arrival_time": 3, "priority": 5}
+  ]
+}

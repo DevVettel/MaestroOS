@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import threading
+from typing import Optional
+
 try:
     import pygame
     import pygame.display
@@ -45,6 +50,79 @@ def _compute_stats(processes, cpu_busy, total_ticks):
         context_switches=0,
     )
 
+
+# ---------------------------------------------------------------------------
+# Thread-safe bridge between tkinter panel and pygame window
+# ---------------------------------------------------------------------------
+
+class SimulationBridge:
+    """Shared state object — all public methods are thread-safe."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._start_payload: Optional[tuple] = None  # (processes, scheduler, memory)
+        self._reset_requested = False
+        self._quit_requested = False
+        self._paused = False
+        self._speed = 200  # ms/tick
+
+    # --- push side (tkinter callbacks) ---
+
+    def push_start(self, processes, scheduler, memory) -> None:
+        with self._lock:
+            self._start_payload = (processes, scheduler, memory)
+            self._reset_requested = False
+            self._paused = False
+
+    def toggle_pause(self) -> None:
+        with self._lock:
+            self._paused = not self._paused
+
+    def push_reset(self) -> None:
+        with self._lock:
+            self._reset_requested = True
+            self._paused = False
+            self._start_payload = None
+
+    def set_speed(self, ms: int) -> None:
+        with self._lock:
+            self._speed = max(1, int(ms))
+
+    def request_quit(self) -> None:
+        with self._lock:
+            self._quit_requested = True
+
+    # --- pop side (pygame thread) ---
+
+    def pop_start(self) -> Optional[tuple]:
+        with self._lock:
+            payload = self._start_payload
+            self._start_payload = None
+            return payload
+
+    def pop_reset(self) -> bool:
+        with self._lock:
+            val = self._reset_requested
+            self._reset_requested = False
+            return val
+
+    @property
+    def should_quit(self) -> bool:
+        with self._lock:
+            return self._quit_requested
+
+    @property
+    def paused(self) -> bool:
+        with self._lock:
+            return self._paused
+
+    @property
+    def speed(self) -> int:
+        with self._lock:
+            return self._speed
+
+
+# ---------------------------------------------------------------------------
 
 class MainWindow:
     def __init__(self):
@@ -149,6 +227,146 @@ class MainWindow:
             pygame.display.flip()
             if paused or scheduler.is_done:
                 pg_clock.tick(30)
+
+        pygame.quit()
+
+    # ------------------------------------------------------------------
+    # Bridge-based dual-window mode
+    # ------------------------------------------------------------------
+
+    def run_with_bridge(self, bridge: SimulationBridge) -> None:
+        """
+        Pygame döngüsü — arka plan thread'de çalışır.
+        tkinter panel bridge üzerinden kontrol eder.
+        Waiting ekranı gösterir; panel Başlat'a basınca simülasyonu başlatır.
+        """
+        pygame.init()
+        screen = pygame.display.set_mode((_W, _H))
+        pygame.display.set_caption("MaestroOS — Simulation")
+        pg_clock = pygame.time.Clock()
+        font = pygame.font.SysFont("monospace", 12)
+        font_lg = pygame.font.SysFont("monospace", 18, bold=True)
+
+        # Simulation state — None means waiting for start
+        processes = None
+        scheduler = None
+        memory_manager = None
+        tick = 0
+        cpu_busy = 0
+        allocated: set = set()
+
+        running = True
+        while running:
+            if bridge.should_quit:
+                running = False
+                break
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        running = False
+                    elif event.key == pygame.K_SPACE and processes is not None:
+                        bridge.toggle_pause()
+                    elif event.key in (pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS):
+                        bridge.set_speed(max(1, bridge.speed - 50))
+                    elif event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+                        bridge.set_speed(min(2000, bridge.speed + 50))
+
+            # --- poll bridge for reset ---
+            if bridge.pop_reset():
+                processes = None
+                scheduler = None
+                memory_manager = None
+                tick = 0
+                cpu_busy = 0
+                allocated = set()
+                self._gantt = GanttChart()
+                self._memmap = MemoryMapView()
+                self._stats = StatsDashboard()
+
+            # --- poll bridge for new simulation ---
+            payload = bridge.pop_start()
+            if payload is not None:
+                processes, scheduler, memory_manager = payload
+                tick = 0
+                cpu_busy = 0
+                allocated = set()
+                self._gantt = GanttChart()
+                self._memmap = MemoryMapView()
+                self._stats = StatsDashboard()
+                scheduler.load_processes(processes)
+
+            # --- simulation tick ---
+            if processes is not None and not bridge.paused and not scheduler.is_done:
+                scheduler.tick(tick)
+
+                active = next(
+                    (p for p in processes if p.state == ProcessState.RUNNING), None
+                )
+                if active:
+                    self._gantt.add_entry(tick, active.pid, active.name)
+                    cpu_busy += 1
+                else:
+                    self._gantt.add_entry(tick, None, "IDLE")
+
+                total_mem = memory_manager.total_free + memory_manager.total_used
+                mem_per_proc = max(16, total_mem // max(len(processes), 1))
+
+                for p in processes:
+                    if p.pid not in allocated and p.state in (
+                        ProcessState.READY, ProcessState.RUNNING
+                    ):
+                        res = memory_manager.allocate(p.pid, mem_per_proc)
+                        if res.success:
+                            allocated.add(p.pid)
+
+                for p in processes:
+                    if p.state == ProcessState.TERMINATED and p.pid in allocated:
+                        memory_manager.deallocate(p.pid)
+                        allocated.discard(p.pid)
+
+                self._memmap.update(memory_manager.memory_map())
+                self._stats.update(_compute_stats(processes, cpu_busy, tick + 1), processes)
+                tick += 1
+                pygame.time.wait(bridge.speed)
+
+            # --- render ---
+            screen.fill(_BG)
+
+            if processes is None:
+                # Waiting screen
+                msg1 = font_lg.render("MaestroOS — Simülatör", True, _HUD_FG)
+                msg2 = font.render("Kontrol panelinden bir senaryo yapılandırın ve Başlat'a basın.",
+                                   True, (100, 100, 120))
+                screen.blit(msg1, ((_W - msg1.get_width()) // 2, _H // 2 - 30))
+                screen.blit(msg2, ((_W - msg2.get_width()) // 2, _H // 2 + 10))
+            else:
+                pygame.draw.line(screen, _DIV, (0, _TOP_H), (_W, _TOP_H), 1)
+                pygame.draw.line(screen, _DIV, (_W // 2, _TOP_H), (_W // 2, _TOP_H + _BOT_H), 1)
+
+                self._gantt.render(screen, 0, 0, _W, _TOP_H)
+                self._memmap.render(screen, 0, _TOP_H, _W // 2, _BOT_H)
+                self._stats.render(screen, _W // 2, _TOP_H, _W // 2, _BOT_H)
+
+                if scheduler.is_done:
+                    status = "DONE — Sıfırla veya yeni senaryo başlatın"
+                elif bridge.paused:
+                    status = "PAUSED"
+                else:
+                    status = "RUNNING"
+
+                hud_text = (
+                    f"Tick:{tick}  Speed:{bridge.speed}ms  {status}  "
+                    f"[SPACE=pause  +/-=speed  ESC=quit]"
+                )
+                pygame.draw.rect(screen, _HUD_BG, (0, _TOP_H + _BOT_H, _W, _HUD_H))
+                hud = font.render(hud_text, True, _HUD_FG)
+                screen.blit(hud, (5, _TOP_H + _BOT_H + 4))
+
+            pygame.display.flip()
+            pg_clock.tick(60)
 
         pygame.quit()
 

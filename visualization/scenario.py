@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Literal
 
 
-AlgorithmName = Literal["FCFS", "SJF", "SRTF", "RoundRobin", "Priority"]
+AlgorithmName = Literal["FCFS", "SJF", "SRTF", "RoundRobin", "Priority", "PreemptivePriority"]
 StrategyName  = Literal["FIRST_FIT", "BEST_FIT", "WORST_FIT"]
 
 
@@ -107,6 +107,53 @@ BUILTIN_SCENARIOS: dict[str, ScenarioConfig] = {
         memory_strategy="BEST_FIT",
     ),
 }
+
+
+def build_simulation(cfg: ScenarioConfig):
+    """
+    ScenarioConfig → (list[Process], Scheduler, MemoryManager).
+
+    Lazy imports break potential circular-import chains.
+    """
+    import importlib
+
+    from core.memory_manager import AllocationStrategy, MemoryManager
+    from core.process import Process
+    from core.scheduler import Scheduler
+
+    _STRATEGY: dict[str, AllocationStrategy] = {
+        "FIRST_FIT": AllocationStrategy.FIRST_FIT,
+        "BEST_FIT":  AllocationStrategy.BEST_FIT,
+        "WORST_FIT": AllocationStrategy.WORST_FIT,
+    }
+    _ALGO: dict[str, tuple[str, str, dict]] = {
+        "FCFS":               ("algorithms.scheduling.fcfs",         "FCFS",                {}),
+        "SJF":                ("algorithms.scheduling.sjf",          "SJF",                 {}),
+        "SRTF":               ("algorithms.scheduling.sjf",          "SRTF",                {}),
+        "RoundRobin":         ("algorithms.scheduling.round_robin",  "RoundRobin",          {"quantum": cfg.quantum}),
+        "Priority":           ("algorithms.scheduling.priority",     "PriorityScheduling",  {}),
+        "PreemptivePriority": ("algorithms.scheduling.priority",     "PreemptivePriority",  {}),
+    }
+
+    mod, cls, kw = _ALGO[cfg.algorithm]
+    algo = getattr(importlib.import_module(mod), cls)(**kw)
+
+    processes = [
+        Process(
+            pid=p.pid,
+            name=p.name,
+            burst_time=p.burst_time,
+            arrival_time=p.arrival_time,
+            priority=p.priority,
+        )
+        for p in cfg.processes
+    ]
+    scheduler = Scheduler(algorithm=algo)
+    memory = MemoryManager(
+        total_size=cfg.memory_size,
+        strategy=_STRATEGY[cfg.memory_strategy],
+    )
+    return processes, scheduler, memory
 
 
 def random_scenario(n: int = 5, seed: int | None = None) -> ScenarioConfig:

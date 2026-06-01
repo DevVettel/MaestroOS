@@ -4,20 +4,28 @@ tkinter Kontrol Paneli — simülasyon parametrelerini yapılandır, senaryo kay
 
 from __future__ import annotations
 
-import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
-from typing import Optional
+import threading
+from pathlib import Path
+from typing import Callable, Optional
+
+try:
+    import tkinter as tk
+    from tkinter import filedialog, messagebox, ttk
+    _TK_AVAILABLE = True
+except ImportError:
+    _TK_AVAILABLE = False
 
 from .scenario import (
     BUILTIN_SCENARIOS,
     ProcessConfig,
     ScenarioConfig,
+    build_simulation,
     load_scenario,
     random_scenario,
     save_scenario,
 )
 
-_ALGORITHMS = ["FCFS", "SJF", "SRTF", "RoundRobin", "Priority"]
+_ALGORITHMS = ["FCFS", "SJF", "SRTF", "RoundRobin", "Priority", "PreemptivePriority"]
 _STRATEGIES  = ["FIRST_FIT", "BEST_FIT", "WORST_FIT"]
 
 _BG      = "#1e1e2e"
@@ -28,13 +36,16 @@ _RED     = "#f38ba8"
 _GREEN   = "#a6e3a1"
 _ENTRY   = "#313244"
 _BORDER  = "#45475a"
+_YELLOW  = "#f9e2af"
+
+_EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
 
 # ---------------------------------------------------------------------------
 # Style helper
 # ---------------------------------------------------------------------------
 
-def _apply_dark_style(root: tk.Tk) -> ttk.Style:
+def _apply_dark_style(root: "tk.Tk") -> "ttk.Style":
     style = ttk.Style(root)
     style.theme_use("clam")
 
@@ -55,6 +66,11 @@ def _apply_dark_style(root: tk.Tk) -> ttk.Style:
                     font=("Consolas", 11, "bold"))
     style.map("Accent.TButton",
               background=[("active", "#89b4fa")],
+              foreground=[("active", _BG)])
+    style.configure("Pause.TButton", background=_YELLOW, foreground=_BG,
+                    font=("Consolas", 10, "bold"))
+    style.map("Pause.TButton",
+              background=[("active", "#fab387")],
               foreground=[("active", _BG)])
     style.configure("TCombobox",   fieldbackground=_ENTRY, background=_SURFACE,
                     foreground=_FG, arrowcolor=_ACCENT, bordercolor=_BORDER)
@@ -86,7 +102,7 @@ class _ProcessTable(ttk.Frame):
     _HEADS = ("PID", "Ad", "Burst", "Arrival", "Priority")
     _WIDTHS = (40, 90, 60, 60, 65)
 
-    def __init__(self, parent: tk.Widget) -> None:
+    def __init__(self, parent: "tk.Widget") -> None:
         super().__init__(parent)
         self._build()
 
@@ -105,12 +121,11 @@ class _ProcessTable(ttk.Frame):
             self._tree.heading(col, text=head)
             self._tree.column(col, width=w, anchor="center")
 
-        # edit frame
         ef = ttk.LabelFrame(self, text=" Process Ekle / Düzenle ")
         ef.pack(fill="x", pady=(6, 0))
 
         labels = ["Ad:", "Burst:", "Arrival:", "Priority:"]
-        self._vars: dict[str, tk.StringVar] = {
+        self._vars: dict[str, "tk.StringVar"] = {
             "name":    tk.StringVar(value="P"),
             "burst":   tk.StringVar(value="5"),
             "arrival": tk.StringVar(value="0"),
@@ -123,10 +138,10 @@ class _ProcessTable(ttk.Frame):
 
         btn_frame = ttk.Frame(ef)
         btn_frame.grid(row=1, column=0, columnspan=8, pady=(0, 4))
-        ttk.Button(btn_frame, text="+ Ekle",    command=self._add).pack(side="left", padx=4)
+        ttk.Button(btn_frame, text="+ Ekle",     command=self._add).pack(side="left", padx=4)
         ttk.Button(btn_frame, text="✎ Güncelle", command=self._update).pack(side="left", padx=4)
-        ttk.Button(btn_frame, text="✕ Sil",     command=self._delete).pack(side="left", padx=4)
-        ttk.Button(btn_frame, text="↑ Seç",     command=self._load_selected).pack(side="left", padx=4)
+        ttk.Button(btn_frame, text="✕ Sil",      command=self._delete).pack(side="left", padx=4)
+        ttk.Button(btn_frame, text="↑ Seç",      command=self._load_selected).pack(side="left", padx=4)
 
         self._tree.bind("<<TreeviewSelect>>", lambda _: self._load_selected())
         self._next_pid = 1
@@ -145,7 +160,6 @@ class _ProcessTable(ttk.Frame):
         if burst <= 0:
             messagebox.showerror("Hata", "Burst süresi 0'dan büyük olmalı.")
             return
-
         self._tree.insert("", "end",
                           values=(self._next_pid, name, burst, arrival, priority))
         self._next_pid += 1
@@ -210,15 +224,31 @@ class ControlPanel:
     """
     tkinter yapılandırma penceresi.
 
-    Kullanım:
+    Modal kullanım (eski):
+        panel  = ControlPanel()
+        config = panel.run()   # None → kullanıcı kapattı
+
+    Eş-zamanlı kullanım (yeni):
         panel = ControlPanel()
-        config = panel.run()          # None → kullanıcı kapattı
-        if config:
-            launch_simulation(config)
+        panel.on_start(lambda procs, sched, mem: ...)
+        panel.on_pause(lambda: ...)
+        panel.on_reset(lambda: ...)
+        panel.on_speed_change(lambda ms: ...)
+        tk_thread = panel.run_as_thread()
+        # ... pygame ana thread'de ...
+        panel.close()
     """
 
     def __init__(self, initial: Optional[ScenarioConfig] = None) -> None:
         self._result: Optional[ScenarioConfig] = None
+        self._sim_running = False
+        self._paused = False
+
+        self._on_start_cb:        Optional[Callable] = None
+        self._on_pause_cb:        Optional[Callable] = None
+        self._on_reset_cb:        Optional[Callable] = None
+        self._on_speed_change_cb: Optional[Callable] = None
+
         self._root = tk.Tk()
         self._root.title("MaestroOS — Kontrol Paneli")
         self._root.configure(bg=_BG)
@@ -227,18 +257,36 @@ class ControlPanel:
         self._build(initial or ScenarioConfig())
 
     # ------------------------------------------------------------------
+    # Callback registration
+    # ------------------------------------------------------------------
+
+    def on_start(self, cb: Callable) -> None:
+        """cb(processes, scheduler, memory_manager) — simülasyon başladığında."""
+        self._on_start_cb = cb
+
+    def on_pause(self, cb: Callable) -> None:
+        """cb() — duraklat/devam her toggle'da."""
+        self._on_pause_cb = cb
+
+    def on_reset(self, cb: Callable) -> None:
+        """cb() — sıfırla butonuna basıldığında."""
+        self._on_reset_cb = cb
+
+    def on_speed_change(self, cb: Callable) -> None:
+        """cb(ms: int) — hız slider değiştiğinde."""
+        self._on_speed_change_cb = cb
+
+    # ------------------------------------------------------------------
     # Build UI
     # ------------------------------------------------------------------
 
     def _build(self, cfg: ScenarioConfig) -> None:
         root = self._root
 
-        # Title
         title = tk.Label(root, text="⚙  MaestroOS Simülatör",
                          bg=_BG, fg=_ACCENT, font=("Consolas", 14, "bold"))
         title.pack(pady=(12, 4))
 
-        # Scenario name row
         name_frame = ttk.Frame(root)
         name_frame.pack(fill="x", padx=16, pady=(0, 4))
         ttk.Label(name_frame, text="Senaryo adı:").pack(side="left")
@@ -246,7 +294,6 @@ class ControlPanel:
         ttk.Entry(name_frame, textvariable=self._scenario_name, width=32).pack(
             side="left", padx=8)
 
-        # Notebook tabs
         nb = ttk.Notebook(root)
         nb.pack(fill="both", expand=True, padx=16, pady=4)
 
@@ -255,20 +302,10 @@ class ControlPanel:
         self._build_memory_tab(nb, cfg)
         self._build_scenario_tab(nb)
 
-        # Bottom buttons
-        btn_frame = ttk.Frame(root)
-        btn_frame.pack(fill="x", padx=16, pady=(4, 12))
+        self._build_speed_frame(root)
+        self._build_button_row(root)
 
-        ttk.Button(btn_frame, text="Rastgele Üret",
-                   command=self._random_scenario).pack(side="left", padx=4)
-        ttk.Button(btn_frame, text="Sıfırla",
-                   command=self._reset).pack(side="left", padx=4)
-
-        ttk.Button(btn_frame, text="▶  Simülasyonu Başlat",
-                   style="Accent.TButton",
-                   command=self._start).pack(side="right", padx=4)
-
-    def _build_process_tab(self, nb: ttk.Notebook, cfg: ScenarioConfig) -> None:
+    def _build_process_tab(self, nb: "ttk.Notebook", cfg: ScenarioConfig) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Processler  ")
         self._proc_table = _ProcessTable(frame)
@@ -276,7 +313,7 @@ class ControlPanel:
         if cfg.processes:
             self._proc_table.load_processes(cfg.processes)
 
-    def _build_scheduler_tab(self, nb: ttk.Notebook, cfg: ScenarioConfig) -> None:
+    def _build_scheduler_tab(self, nb: "ttk.Notebook", cfg: ScenarioConfig) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Zamanlayıcı  ")
 
@@ -286,7 +323,7 @@ class ControlPanel:
         ttk.Label(lf, text="Algoritma:").grid(row=0, column=0, padx=12, pady=8, sticky="w")
         self._algo_var = tk.StringVar(value=cfg.algorithm)
         combo = ttk.Combobox(lf, textvariable=self._algo_var,
-                             values=_ALGORITHMS, state="readonly", width=16)
+                             values=_ALGORITHMS, state="readonly", width=20)
         combo.grid(row=0, column=1, padx=8, pady=8, sticky="w")
         combo.bind("<<ComboboxSelected>>", self._on_algo_change)
 
@@ -296,14 +333,13 @@ class ControlPanel:
                                          from_=1, to=20, width=6)
         self._quantum_spin.grid(row=1, column=1, padx=8, pady=8, sticky="w")
 
-        # Algo descriptions
         self._algo_desc_var = tk.StringVar()
         ttk.Label(lf, textvariable=self._algo_desc_var,
-                  foreground="#6c7086", wraplength=340).grid(
+                  foreground="#6c7086", wraplength=360).grid(
             row=2, column=0, columnspan=2, padx=12, pady=(0, 8), sticky="w")
         self._update_algo_desc()
 
-    def _build_memory_tab(self, nb: ttk.Notebook, cfg: ScenarioConfig) -> None:
+    def _build_memory_tab(self, nb: "ttk.Notebook", cfg: ScenarioConfig) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Bellek  ")
 
@@ -313,7 +349,7 @@ class ControlPanel:
         ttk.Label(lf, text="Toplam boyut (byte):").grid(row=0, column=0, padx=12, pady=8, sticky="w")
         self._mem_size_var = tk.IntVar(value=cfg.memory_size)
         ttk.Spinbox(lf, textvariable=self._mem_size_var,
-                    from_=128, to=16384, increment=128, width=8).grid(
+                    from_=256, to=4096, increment=256, width=8).grid(
             row=0, column=1, padx=8, pady=8, sticky="w")
 
         ttk.Label(lf, text="Strateji:").grid(row=1, column=0, padx=12, pady=8, sticky="w")
@@ -332,11 +368,10 @@ class ControlPanel:
                       foreground="#6c7086").grid(
                 row=2 + i, column=0, columnspan=2, padx=12, pady=1, sticky="w")
 
-    def _build_scenario_tab(self, nb: ttk.Notebook) -> None:
+    def _build_scenario_tab(self, nb: "ttk.Notebook") -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Senaryolar  ")
 
-        # Builtin scenarios
         bi_lf = ttk.LabelFrame(frame, text=" Hazır Senaryolar ")
         bi_lf.pack(fill="x", padx=16, pady=(12, 4))
 
@@ -348,7 +383,6 @@ class ControlPanel:
         ttk.Button(bi_lf, text="Yükle",
                    command=self._load_builtin).pack(side="left", padx=4)
 
-        # File operations
         file_lf = ttk.LabelFrame(frame, text=" Dosya İşlemleri ")
         file_lf.pack(fill="x", padx=16, pady=4)
 
@@ -357,12 +391,50 @@ class ControlPanel:
         ttk.Button(file_lf, text="📂 JSON Yükle",
                    command=self._load_json).pack(side="left", padx=4, pady=8)
 
-        # Info
         info = ttk.Label(frame,
                          text="Senaryolar .json formatında kaydedilir.\n"
                               "Tüm process, zamanlayıcı ve bellek ayarları saklanır.",
                          foreground="#6c7086")
         info.pack(padx=16, pady=8, anchor="w")
+
+    def _build_speed_frame(self, root: "tk.Tk") -> None:
+        sf = ttk.LabelFrame(root, text=" Simülasyon Hızı ")
+        sf.pack(fill="x", padx=16, pady=(2, 4))
+
+        self._speed_var = tk.IntVar(value=200)
+        self._speed_label_var = tk.StringVar(value="200 ms/tick")
+
+        ttk.Label(sf, text="Hız (1–500 ms/tick):").pack(side="left", padx=(8, 4), pady=6)
+        scale = ttk.Scale(sf, from_=1, to=500, orient="horizontal",
+                          variable=self._speed_var,
+                          command=self._on_speed_change)
+        scale.pack(side="left", fill="x", expand=True, padx=4, pady=6)
+        ttk.Label(sf, textvariable=self._speed_label_var, width=10).pack(
+            side="left", padx=(4, 8), pady=6)
+
+    def _build_button_row(self, root: "tk.Tk") -> None:
+        btn_frame = ttk.Frame(root)
+        btn_frame.pack(fill="x", padx=16, pady=(4, 12))
+
+        # Left: utility buttons
+        ttk.Button(btn_frame, text="Rastgele Üret",
+                   command=self._random_scenario).pack(side="left", padx=4)
+        ttk.Button(btn_frame, text="💾 Kaydet",
+                   command=self._save_json).pack(side="left", padx=4)
+        ttk.Button(btn_frame, text="📂 Yükle",
+                   command=self._load_json).pack(side="left", padx=4)
+
+        # Right: simulation control (right-to-left order)
+        ttk.Button(btn_frame, text="▶  Başlat",
+                   style="Accent.TButton",
+                   command=self._start).pack(side="right", padx=4)
+        ttk.Button(btn_frame, text="↺  Sıfırla",
+                   command=self._reset).pack(side="right", padx=4)
+        self._pause_btn = ttk.Button(btn_frame, text="⏸  Duraklat",
+                                     style="Pause.TButton",
+                                     command=self._pause,
+                                     state="disabled")
+        self._pause_btn.pack(side="right", padx=4)
 
     # ------------------------------------------------------------------
     # Event handlers
@@ -373,15 +445,22 @@ class ControlPanel:
 
     def _update_algo_desc(self) -> None:
         descs = {
-            "FCFS":       "First Come First Served — en basit, non-preemptive",
-            "SJF":        "Shortest Job First — en kısa burst önce, non-preemptive",
-            "SRTF":       "Shortest Remaining Time First — SJF'in preemptive hali",
-            "RoundRobin": "Round Robin — her process quantum kadar CPU alır, Quantum değeri aktif",
-            "Priority":   "Priority Scheduling — düşük sayı = yüksek öncelik, preemptive",
+            "FCFS":               "First Come First Served — en basit, non-preemptive",
+            "SJF":                "Shortest Job First — en kısa burst önce, non-preemptive",
+            "SRTF":               "Shortest Remaining Time First — SJF'in preemptive hali",
+            "RoundRobin":         "Round Robin — her process quantum kadar CPU alır, Quantum değeri aktif",
+            "Priority":           "Priority Scheduling — düşük sayı = yüksek öncelik, non-preemptive",
+            "PreemptivePriority": "Preemptive Priority — öncelik bazlı preemptive zamanlama",
         }
         self._algo_desc_var.set(descs.get(self._algo_var.get(), ""))
         is_rr = self._algo_var.get() == "RoundRobin"
         self._quantum_spin.configure(state="normal" if is_rr else "disabled")
+
+    def _on_speed_change(self, _val=None) -> None:
+        ms = int(self._speed_var.get())
+        self._speed_label_var.set(f"{ms} ms/tick")
+        if self._on_speed_change_cb:
+            self._on_speed_change_cb(ms)
 
     def _load_builtin(self) -> None:
         name = self._builtin_var.get()
@@ -393,6 +472,11 @@ class ControlPanel:
         self._apply_config(cfg)
 
     def _reset(self) -> None:
+        self._sim_running = False
+        self._paused = False
+        self._pause_btn.configure(state="disabled", text="⏸  Duraklat")
+        if self._on_reset_cb:
+            self._on_reset_cb()
         self._apply_config(ScenarioConfig())
 
     def _apply_config(self, cfg: ScenarioConfig) -> None:
@@ -405,13 +489,15 @@ class ControlPanel:
         self._update_algo_desc()
 
     def _save_json(self) -> None:
-        cfg  = self._collect_config()
+        cfg = self._collect_config()
         if cfg is None:
             return
+        _EXAMPLES_DIR.mkdir(parents=True, exist_ok=True)
         path = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON", "*.json"), ("Tüm dosyalar", "*.*")],
             title="Senaryo kaydet",
+            initialdir=str(_EXAMPLES_DIR),
             initialfile=cfg.name.replace(" ", "_") + ".json",
         )
         if path:
@@ -419,9 +505,11 @@ class ControlPanel:
             messagebox.showinfo("Kaydedildi", f"Senaryo kaydedildi:\n{path}")
 
     def _load_json(self) -> None:
+        _EXAMPLES_DIR.mkdir(parents=True, exist_ok=True)
         path = filedialog.askopenfilename(
             filetypes=[("JSON", "*.json"), ("Tüm dosyalar", "*.*")],
             title="Senaryo yükle",
+            initialdir=str(_EXAMPLES_DIR),
         )
         if path:
             try:
@@ -446,12 +534,46 @@ class ControlPanel:
 
     def _start(self) -> None:
         cfg = self._collect_config()
-        if cfg is not None:
-            self._result = cfg
+        if cfg is None:
+            return
+        self._result = cfg
+
+        if self._on_start_cb:
+            processes, scheduler, memory = build_simulation(cfg)
+            self._on_start_cb(processes, scheduler, memory)
+            self._sim_running = True
+            self._paused = False
+            self._pause_btn.configure(state="normal", text="⏸  Duraklat")
+        else:
+            # Legacy modal mode: destroy window so run() can return
             self._root.destroy()
 
+    def _pause(self) -> None:
+        self._paused = not self._paused
+        self._pause_btn.configure(
+            text="▶  Devam" if self._paused else "⏸  Duraklat"
+        )
+        if self._on_pause_cb:
+            self._on_pause_cb()
+
+    # ------------------------------------------------------------------
+    # Run modes
     # ------------------------------------------------------------------
 
     def run(self) -> Optional[ScenarioConfig]:
+        """Modal mode — blocks until user clicks Başlat or closes window."""
         self._root.mainloop()
         return self._result
+
+    def run_as_thread(self) -> threading.Thread:
+        """Starts tkinter mainloop in a background daemon thread."""
+        t = threading.Thread(target=self._root.mainloop, daemon=True, name="tk-panel")
+        t.start()
+        return t
+
+    def close(self) -> None:
+        """Safely destroys the tkinter window from any thread."""
+        try:
+            self._root.destroy()
+        except Exception:
+            pass

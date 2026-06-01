@@ -1,81 +1,43 @@
 """
 MaestroOS — Giriş noktası.
 
-Akış:
-  1. tkinter Kontrol Paneli → kullanıcı yapılandırır
-  2. Kullanıcı "Simülasyonu Başlat" → ScenarioConfig döner
-  3. Config → Process / Scheduler / MemoryManager nesnelerine dönüştürülür
-  4. Pygame MainWindow simülasyonu çalıştırır
+Threading modeli (Windows COM uyumlu):
+  - tkinter ana thread'de çalışır (Tcl apartment threading zorunluluğu)
+  - pygame arka plan thread'de çalışır (SDL2 bunu destekler)
+  - SimulationBridge ikisi arasında thread-safe iletişimi sağlar
 """
 
 from __future__ import annotations
 
-import sys
+import threading
 
-from core.memory_manager import AllocationStrategy, MemoryManager
-from core.process import Process
-from core.scheduler import Scheduler
 from visualization.control_panel import ControlPanel
-from visualization.main_window import MainWindow
-from visualization.scenario import ScenarioConfig
-
-
-_ALGO_MAP = {
-    "FCFS":       lambda cfg: _import("algorithms.scheduling.fcfs", "FCFS")(),
-    "SJF":        lambda cfg: _import("algorithms.scheduling.sjf", "SJF")(),
-    "SRTF":       lambda cfg: _import("algorithms.scheduling.sjf", "SRTF")(),
-    "RoundRobin": lambda cfg: _import("algorithms.scheduling.round_robin", "RoundRobin")(quantum=cfg.quantum),
-    "Priority":   lambda cfg: _import("algorithms.scheduling.priority", "PriorityScheduling")(),
-}
-
-_STRATEGY_MAP = {
-    "FIRST_FIT": AllocationStrategy.FIRST_FIT,
-    "BEST_FIT":  AllocationStrategy.BEST_FIT,
-    "WORST_FIT": AllocationStrategy.WORST_FIT,
-}
-
-
-def _import(module: str, cls: str):
-    import importlib
-    return getattr(importlib.import_module(module), cls)
-
-
-def _build_simulation(cfg: ScenarioConfig):
-    processes = [
-        Process(
-            pid=p.pid,
-            name=p.name,
-            burst_time=p.burst_time,
-            arrival_time=p.arrival_time,
-            priority=p.priority,
-        )
-        for p in cfg.processes
-    ]
-
-    algo      = _ALGO_MAP[cfg.algorithm](cfg)
-    scheduler = Scheduler(algorithm=algo)
-
-    memory    = MemoryManager(
-        total_size=cfg.memory_size,
-        strategy=_STRATEGY_MAP[cfg.memory_strategy],
-    )
-
-    return processes, scheduler, memory
+from visualization.main_window import MainWindow, SimulationBridge
 
 
 def main() -> None:
-    while True:
-        panel  = ControlPanel()
-        config = panel.run()
+    bridge = SimulationBridge()
 
-        if config is None:
-            # Kullanıcı pencereyi kapattı
-            sys.exit(0)
+    # ControlPanel.__init__ burada çağrılır — tk.Tk() ana thread'de oluşturulur
+    panel = ControlPanel()
+    panel.on_start(bridge.push_start)
+    panel.on_pause(bridge.toggle_pause)
+    panel.on_reset(bridge.push_reset)
+    panel.on_speed_change(bridge.set_speed)
 
-        processes, scheduler, memory = _build_simulation(config)
-        window = MainWindow()
-        window.run_simulation(processes, scheduler, memory)
-        # Simülasyon bitti → tekrar Kontrol Paneli aç
+    window = MainWindow()
+    pygame_thread = threading.Thread(
+        target=window.run_with_bridge,
+        args=(bridge,),
+        daemon=True,
+        name="pygame-sim",
+    )
+    pygame_thread.start()
+
+    panel.run()  # tkinter mainloop — ana thread'de bloklar, pencere kapanınca döner
+
+    bridge.request_quit()        # pygame döngüsüne çıkış sinyali
+    pygame_thread.join(timeout=3)
 
 
 if __name__ == "__main__":
