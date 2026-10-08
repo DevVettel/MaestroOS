@@ -1,5 +1,10 @@
 # MaestroOS
 
+[![CI](https://github.com/DevVettel/MaestroOS/actions/workflows/ci.yml/badge.svg)](https://github.com/DevVettel/MaestroOS/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 **MaestroOS**, temel işletim sistemi kavramlarını — process scheduling, bellek yönetimi, sanal bellek/paging, deadlock detection & avoidance ve IPC senkronizasyonu — gerçek zamanlı olarak görselleştiren, saf Python ile yazılmış bir masaüstü işletim sistemi simülatörüdür.
 
 Simülasyon motoru tamamen deterministik, tick tabanlı bir saat üzerine kuruludur; hiçbir algoritma gerçek zamana bağlı değildir. Bu sayede hem test edilebilir hem de saniyede binlerce tick hızında koşturulabilir, hem de `pygame` + `tkinter` arayüzü üzerinden adım adım izlenebilir.
@@ -46,6 +51,7 @@ Simülasyon motoru tamamen deterministik, tick tabanlı bir saat üzerine kurulu
 ### 🔒 Deadlock Detection & Avoidance
 - Resource Allocation Graph (RAG) — DFS tabanlı döngü (cycle) tespiti
 - Banker's Algorithm — güvenli durum (safe state) analizi ve kaynak talebi değerlendirmesi
+- **Deadlock görselleştirici** (`python main.py --deadlock`): RAG adım adım oynatılır; process'ler daire, kaynaklar instance noktalı kare olarak çizilir, istek (P → R) kesikli ve atama (R → P) düz kenarla gösterilir, döngü oluştuğu anda deadlock'taki düğüm ve kenarlar kırmızıya döner. Banker's modunda Allocation / Max / Need tablosu, güvenli sıra ve her talebin kabul/ret gerekçesi (Max aşımı, yetersiz kaynak, güvensiz durum) gösterilir
 
 ### 🔗 IPC & Senkronizasyon
 - Pipe (POSIX benzeri EOF semantiği ile), öncelik destekli Message Queue
@@ -137,11 +143,15 @@ MaestroOS/
 │   ├── gantt_chart.py      # Gerçek zamanlı Gantt chart render
 │   ├── memory_map.py       # Bellek haritası render (fragmentation renkli)
 │   ├── stats_dashboard.py  # matplotlib istatistik paneli
-│   └── scenario.py         # JSON senaryo kaydet/yükle + hazır senaryolar
+│   ├── scenario.py         # JSON senaryo kaydet/yükle + hazır senaryolar
+│   ├── deadlock_scenario.py # Adım adım RAG / Banker's senaryo oynatıcıları (pygame'siz)
+│   └── deadlock_view.py    # pygame deadlock görselleştirici
 ├── examples/                # Hazır JSON senaryolar (deadlock, RR, bellek stresi)
-├── tests/                   # 280+ unit/integration testi (pytest)
+├── tests/                   # 330 unit/integration testi (pytest)
 ├── docs/                    # Proje rehberi (CLAUDE.md) ve notlar
-└── main.py                  # Giriş noktası
+├── .github/workflows/ci.yml # GitHub Actions: pytest + ruff + mypy
+├── pyproject.toml           # Paket, pytest, ruff ve mypy ayarları
+└── main.py                  # Giriş noktası (--deadlock bayrağı)
 ```
 
 ---
@@ -173,6 +183,42 @@ python3 main.py
 ```
 
 Kontrol panelinden bir hazır senaryo seçin (veya kendi process setinizi oluşturun), algoritma/quantum/bellek stratejisini belirleyin ve **Başlat**'a basın. Simülasyon penceresi Gantt chart, bellek haritası ve istatistikleri gerçek zamanlı günceller.
+
+### Deadlock görselleştirici
+
+```bash
+python3 main.py --deadlock                                   # hazır senaryolar
+python3 main.py --deadlock examples/deadlock_rag_demo.json   # kendi RAG senaryonuz
+python3 main.py --deadlock examples/deadlock_banker_demo.json
+```
+
+| Tuş | İşlev |
+| :--- | :--- |
+| `→` / `SPACE` · `←` | Bir adım ileri · geri |
+| `R` | Senaryoyu başa sar |
+| `TAB` | Sonraki senaryo |
+| `1` / `2` | RAG / Banker's modu |
+| `A` | Otomatik oynat |
+| `ESC` | Çıkış |
+
+Hazır senaryolar: **Dining Philosophers** (deadlock + kurtarma), **İki process / iki kilit** (A-B / B-A kilit sırası hatası), **Bekleme zinciri** (döngüsüz bekleme, deadlock yok) ve ders kitabındaki **Silberschatz Banker's örneği**.
+
+RAG senaryoları `request`, `assign`, `release` ve `cancel` olaylarından oluşan bir listedir:
+
+```json
+{
+  "type": "rag",
+  "name": "İki kilit",
+  "processes": [{"pid": 1, "name": "A"}, {"pid": 2, "name": "B"}],
+  "resources": [{"rid": 1, "name": "X", "instances": 1}, {"rid": 2, "name": "Y", "instances": 1}],
+  "events": [
+    {"action": "assign",  "pid": 1, "rid": 1, "note": "A, X'i kilitledi"},
+    {"action": "assign",  "pid": 2, "rid": 2, "note": "B, Y'yi kilitledi"},
+    {"action": "request", "pid": 1, "rid": 2, "note": "A, Y'yi bekliyor"},
+    {"action": "request", "pid": 2, "rid": 1, "note": "B, X'i bekliyor: deadlock"}
+  ]
+}
+```
 
 ### Programatik kullanım
 
@@ -244,6 +290,8 @@ Tüm scheduling algoritmaları `core.scheduler.SchedulingAlgorithm` soyut sını
 | `round_robin_demo.json` | 6 process ile klasik Round Robin akışı |
 | `deadlock_demo.json` | Yüksek öncelik çakışması senaryosu (Priority scheduling) |
 | `memory_stress_demo.json` | 10 process, 256 byte'lık kısıtlı bellek — fragmentation'ı zorlar |
+| `deadlock_rag_demo.json` | 3 transaction'lı veritabanı kilit döngüsü ve rollback ile kurtarma (`--deadlock`) |
+| `deadlock_banker_demo.json` | Silberschatz Banker's örneği: kabul, yetersiz kaynak, güvensiz durum, Max aşımı (`--deadlock`) |
 
 Kontrol paneli ayrıca dahili (`BUILTIN_SCENARIOS`) hazır senaryolar ve rastgele senaryo üretici (`random_scenario`) içerir.
 
@@ -251,10 +299,13 @@ Kontrol paneli ayrıca dahili (`BUILTIN_SCENARIOS`) hazır senaryolar ve rastgel
 
 ## Test
 
-Proje, 280'den fazla unit/integration testi ile geliştirme fazlarına göre organize edilmiştir:
+Proje, 330 unit/integration testi ile geliştirme fazlarına göre organize edilmiştir:
 
 ```bash
+pip install -e ".[dev]"    # geliştirme bağımlılıkları (pytest, ruff, mypy)
 pytest                     # tüm testler
+pytest --cov               # coverage raporu ile
+ruff check . && mypy       # lint + tip kontrolü (CI'da da çalışır)
 pytest tests/test_phase1.py -v   # process & scheduling
 pytest tests/test_phase2.py -v   # bellek yönetimi
 pytest tests/test_phase3.py -v   # paging & sanal bellek
@@ -268,6 +319,7 @@ pytest tests/test_phase4.py -v   # deadlock & IPC
 | `test_phase3.py` | `PageTable`, `TLB`, FIFO/LRU/Optimal, `VirtualMemoryManager` |
 | `test_phase4.py` | `SJF`, `SRTF`, `RoundRobin`, `Priority`, `PreemptivePriority` |
 | `test_deadlock.py` | `ResourceAllocationGraph`, `BankersAlgorithm` |
+| `test_deadlock_viz.py` | Deadlock senaryo oynatıcıları, yerleşim, JSON, headless pygame render |
 | `test_ipc.py` | `Pipe`, `MessageQueue`, `Semaphore`, `Mutex`, `Monitor`, klasik IPC problemleri |
 
 ---
@@ -292,7 +344,9 @@ pytest tests/test_phase4.py -v   # deadlock & IPC
 - [ ] Disk scheduling (FCFS, SSTF, SCAN, C-SCAN) ve basit dosya sistemi
 - [ ] Segmentation (paging'e alternatif bellek modeli)
 - [ ] Web dashboard (FastAPI + WebSocket + React/D3.js) — masaüstü GUI'ye alternatif
-- [ ] CI/CD (GitHub Actions: test + lint) ve Docker containerization
+- [x] **Deadlock görselleştirme** — adım adım RAG ve Banker's Algorithm ekranı
+- [x] **CI** — GitHub Actions (pytest 3.11/3.12 + ruff + mypy), `pyproject.toml`
+- [ ] Docker containerization
 
 Detaylı geliştirme günlüğü ve öğrenme notları için [`docs/CLAUDE.md`](docs/CLAUDE.md) dosyasına bakabilirsiniz.
 

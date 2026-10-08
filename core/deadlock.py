@@ -97,6 +97,16 @@ class ResourceAllocationGraph:
         """
         self._request_edges[pid].add(rid)
 
+    def cancel_request(self, pid: int, rid: int) -> None:
+        """
+        P → R istek kenarını kaldırır (talep karşılandı veya geri çekildi).
+
+        Args:
+            pid: Talebi geri çeken process kimliği
+            rid: Talep edilen kaynak kimliği
+        """
+        self._request_edges.get(pid, set()).discard(rid)
+
     def assignment_edge(self, pid: int, rid: int) -> None:
         """
         R → P atama kenarı ekler: kaynak, process'e atandı.
@@ -212,6 +222,37 @@ class ResourceAllocationGraph:
     def get_requested_resources(self, pid: int) -> set[int]:
         """Process'in talep ettiği kaynak rid'lerini döner."""
         return set(self._request_edges.get(pid, set()))
+
+    def get_resources(self) -> dict[int, Resource]:
+        """Graftaki tüm kaynakları rid → Resource olarak döner."""
+        return dict(self._resources)
+
+    def get_wait_for_graph(self) -> dict[int, set[int]]:
+        """Wait-for grafiğinin bir kopyasını döner (pid → beklediği pid'ler)."""
+        return {p: set(n) for p, n in self._build_wait_for_graph().items()}
+
+    def get_deadlock_edges(self) -> set[tuple[str, int, int]]:
+        """
+        Deadlock döngüsüne katılan RAG kenarlarını döner.
+
+        Kenarlar ("request", pid, rid) veya ("assignment", pid, rid)
+        biçimindedir. Bir istek kenarı, isteyen ve kaynağı tutan
+        process'lerin ikisi de deadlock'taysa döngünün parçasıdır;
+        atama kenarı için de simetrik kural geçerlidir.
+
+        Returns:
+            Döngüdeki kenarların kümesi; deadlock yoksa boş küme.
+        """
+        deadlocked = set(self.detect_deadlock())
+        edges: set[tuple[str, int, int]] = set()
+        for pid in deadlocked:
+            for rid in self._request_edges.get(pid, set()):
+                if any(rid in self._assignment_edges[h] for h in deadlocked if h != pid):
+                    edges.add(("request", pid, rid))
+            for rid in self._assignment_edges.get(pid, set()):
+                if any(rid in self._request_edges[w] for w in deadlocked if w != pid):
+                    edges.add(("assignment", pid, rid))
+        return edges
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,109 @@
+{
+  "type": "rag",
+  "name": "Veritabanı kilitleri (3 transaction)",
+  "processes": [
+    {
+      "pid": 1,
+      "name": "T1"
+    },
+    {
+      "pid": 2,
+      "name": "T2"
+    },
+    {
+      "pid": 3,
+      "name": "T3"
+    }
+  ],
+  "resources": [
+    {
+      "rid": 1,
+      "name": "Row-A",
+      "instances": 1
+    },
+    {
+      "rid": 2,
+      "name": "Row-B",
+      "instances": 1
+    },
+    {
+      "rid": 3,
+      "name": "Row-C",
+      "instances": 1
+    },
+    {
+      "rid": 4,
+      "name": "Log",
+      "instances": 2
+    }
+  ],
+  "events": [
+    {
+      "action": "assign",
+      "pid": 1,
+      "rid": 4,
+      "note": "T1 log yazıcısından bir instance aldı"
+    },
+    {
+      "action": "assign",
+      "pid": 1,
+      "rid": 1,
+      "note": "T1 Row-A'yı kilitledi"
+    },
+    {
+      "action": "assign",
+      "pid": 2,
+      "rid": 2,
+      "note": "T2 Row-B'yi kilitledi"
+    },
+    {
+      "action": "assign",
+      "pid": 3,
+      "rid": 3,
+      "note": "T3 Row-C'yi kilitledi"
+    },
+    {
+      "action": "assign",
+      "pid": 2,
+      "rid": 4,
+      "note": "T2 log yazıcısından ikinci instance'ı aldı"
+    },
+    {
+      "action": "request",
+      "pid": 1,
+      "rid": 2,
+      "note": "T1 Row-B'yi bekliyor"
+    },
+    {
+      "action": "request",
+      "pid": 2,
+      "rid": 3,
+      "note": "T2 Row-C'yi bekliyor"
+    },
+    {
+      "action": "request",
+      "pid": 3,
+      "rid": 1,
+      "note": "T3 Row-A'yı bekliyor: DEADLOCK"
+    },
+    {
+      "action": "cancel",
+      "pid": 3,
+      "rid": 1,
+      "note": "Kurtarma: T3 rollback edildi"
+    },
+    {
+      "action": "release",
+      "pid": 3,
+      "rid": 3,
+      "note": "T3 Row-C'yi bıraktı"
+    },
+    {
+      "action": "assign",
+      "pid": 2,
+      "rid": 3,
+      "note": "T2 Row-C'yi aldı ve commit edebilir"
+    }
+  ],
+  "description": "Üç transaction satır kilitlerini farklı sırayla alır: T1->T2->T3->T1 döngüsü."
+}

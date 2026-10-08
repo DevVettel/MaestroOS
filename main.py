@@ -9,13 +9,29 @@ Threading modeli (Windows COM uyumlu):
 
 from __future__ import annotations
 
+import argparse
 import threading
-
-from visualization.control_panel import ControlPanel
-from visualization.main_window import MainWindow, SimulationBridge
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="MaestroOS — işletim sistemi simülatörü")
+    parser.add_argument(
+        "--deadlock",
+        nargs="?",
+        const="",
+        metavar="SENARYO.json",
+        help="Deadlock görselleştiricisini aç (isteğe bağlı RAG/Banker JSON senaryosu)",
+    )
+    args = parser.parse_args()
+
+    if args.deadlock is not None:
+        from visualization.deadlock_view import run as run_deadlock
+        run_deadlock(args.deadlock or None)
+        return
+
+    from visualization.control_panel import ControlPanel
+    from visualization.main_window import MainWindow, SimulationBridge
+
     bridge = SimulationBridge()
 
     # ControlPanel.__init__ burada çağrılır — tk.Tk() ana thread'de oluşturulur

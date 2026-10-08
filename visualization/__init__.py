@@ -2,7 +2,7 @@ from .scenario import ProcessConfig, ScenarioConfig, load_scenario, save_scenari
 
 __all__ = [
     "ScenarioConfig", "ProcessConfig", "save_scenario", "load_scenario",
-    "GanttChart", "MemoryMapView", "StatsDashboard", "MainWindow", "ControlPanel",
+    "GanttChart", "MemoryMapView", "StatsDashboard", "MainWindow", "ControlPanel", "DeadlockVisualizer",
 ]
 
 
@@ -22,4 +22,7 @@ def __getattr__(name: str):
     if name in ("ControlPanel",):
         from .control_panel import ControlPanel
         return ControlPanel
+    if name in ("DeadlockVisualizer",):
+        from .deadlock_view import DeadlockVisualizer
+        return DeadlockVisualizer
     raise AttributeError(f"module 'visualization' has no attribute {name!r}")
