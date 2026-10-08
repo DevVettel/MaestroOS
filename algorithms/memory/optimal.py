@@ -9,8 +9,6 @@ ve alt sınır (lower bound) hesabı için kullanılır.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from algorithms.memory.page_replacement import PageReplacementAlgorithm
 
 
@@ -32,7 +30,7 @@ class Optimal(PageReplacementAlgorithm):
         self,
         occupied_frames: dict[int, tuple[int, int]],
         tick: int,
-        future_refs: Optional[list[tuple[int, int]]] = None,
+        future_refs: list[tuple[int, int]] | None = None,
     ) -> int:
         """
         Gelecekte en geç kullanılacak sayfanın bulunduğu frame'i döndür.

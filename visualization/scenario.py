@@ -10,7 +10,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Literal
 
-
 AlgorithmName = Literal["FCFS", "SJF", "SRTF", "RoundRobin", "Priority", "PreemptivePriority"]
 StrategyName  = Literal["FIRST_FIT", "BEST_FIT", "WORST_FIT"]
 

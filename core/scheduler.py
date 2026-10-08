@@ -9,8 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections import deque
-from dataclasses import dataclass, field
-from typing import Optional
+from dataclasses import dataclass
 
 from core.process import Process, ProcessState
 
@@ -65,7 +64,7 @@ class SchedulingAlgorithm(ABC):
         self,
         ready_queue: deque[Process],
         current_tick: int,
-    ) -> Optional[Process]:
+    ) -> Process | None:
         """
         Ready queue'dan bir sonraki çalışacak process'i seç.
 
@@ -80,12 +79,12 @@ class SchedulingAlgorithm(ABC):
 
     @abstractmethod
     def on_tick(
-        self, 
-        current_process, 
-        current_tick, 
+        self,
+        current_process,
+        current_tick,
         ready_queue=None
         ) -> bool:
-        
+
         """
         Her tick'te çağrılır. Preemption kararı verir.
 
@@ -114,7 +113,7 @@ class Scheduler:
     def __init__(self, algorithm: SchedulingAlgorithm) -> None:
         self.algorithm = algorithm
         self.ready_queue: deque[Process] = deque()
-        self.current_process: Optional[Process] = None
+        self.current_process: Process | None = None
         self.completed: list[Process] = []
         self.stats = SchedulerStats()
         self._all_processes: list[Process] = []

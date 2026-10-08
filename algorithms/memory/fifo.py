@@ -8,7 +8,6 @@ ancak Bélády anomalisine açıktır: daha fazla frame → daha fazla page faul
 from __future__ import annotations
 
 from collections import deque
-from typing import Optional
 
 from algorithms.memory.page_replacement import PageReplacementAlgorithm
 
@@ -38,7 +37,7 @@ class FIFO(PageReplacementAlgorithm):
         self,
         occupied_frames: dict[int, tuple[int, int]],
         tick: int,
-        future_refs: Optional[list[tuple[int, int]]] = None,
+        future_refs: list[tuple[int, int]] | None = None,
     ) -> int:
         """Kuyruğun başındaki (en eski yüklenen) frame'i döndür."""
         for frame in self._queue:

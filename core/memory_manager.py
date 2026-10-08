@@ -16,9 +16,8 @@ Fragmentation türleri:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
 
 
 class AllocationStrategy(Enum):
@@ -38,7 +37,7 @@ class MemoryBlock:
     """
     start: int
     size: int
-    pid: Optional[int] = None
+    pid: int | None = None
 
     @property
     def end(self) -> int:
@@ -57,7 +56,7 @@ class MemoryBlock:
 class AllocationResult:
     """Bir allocation işleminin sonucu."""
     success: bool
-    block: Optional[MemoryBlock] = None
+    block: MemoryBlock | None = None
     message: str = ""
 
 

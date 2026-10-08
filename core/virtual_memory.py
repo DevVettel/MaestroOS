@@ -12,11 +12,9 @@ Desteklenen page replacement stratejileri (algorithms/memory/):
 
 from __future__ import annotations
 
-from typing import Optional
-
-from core.paging import PageFault, PageTable, TLB
-from algorithms.memory.page_replacement import PageReplacementAlgorithm
 from algorithms.memory.fifo import FIFO
+from algorithms.memory.page_replacement import PageReplacementAlgorithm
+from core.paging import TLB, PageFault, PageTable
 
 
 class VirtualMemoryManager:
@@ -34,7 +32,7 @@ class VirtualMemoryManager:
         num_frames: int,
         page_size: int = 4096,
         tlb_capacity: int = 16,
-        strategy: Optional[PageReplacementAlgorithm] = None,
+        strategy: PageReplacementAlgorithm | None = None,
     ) -> None:
         if num_frames <= 0:
             raise ValueError(f"num_frames pozitif olmalı, verildi: {num_frames}")

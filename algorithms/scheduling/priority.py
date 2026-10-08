@@ -14,7 +14,6 @@ Kritik sorun — Starvation:
 from __future__ import annotations
 
 from collections import deque
-from typing import Optional
 
 from core.process import Process
 from core.scheduler import SchedulingAlgorithm
@@ -30,7 +29,7 @@ class PriorityScheduling(SchedulingAlgorithm):
                         None = aging kapalı (starvation riski var).
     """
 
-    def __init__(self, aging_interval: Optional[int] = 10) -> None:
+    def __init__(self, aging_interval: int | None = 10) -> None:
         if aging_interval is not None and aging_interval <= 0:
             raise ValueError(f"aging_interval pozitif olmalı, verildi: {aging_interval}")
         self.aging_interval = aging_interval
@@ -40,7 +39,7 @@ class PriorityScheduling(SchedulingAlgorithm):
         self,
         ready_queue: deque[Process],
         current_tick: int,
-    ) -> Optional[Process]:
+    ) -> Process | None:
         if not ready_queue:
             return None
         # En düşük priority sayısı = en yüksek öncelik
@@ -49,9 +48,9 @@ class PriorityScheduling(SchedulingAlgorithm):
 
     def on_tick(
         self,
-        current_process: Optional[Process],
+        current_process: Process | None,
         current_tick: int,
-        ready_queue: Optional[deque[Process]] = None,
+        ready_queue: deque[Process] | None = None,
     ) -> bool:
         """Non-preemptive — asla preempt etme."""
         # Aging: her aging_interval tick'te bekleyenlerin önceliğini artır
@@ -78,7 +77,7 @@ class PreemptivePriority(SchedulingAlgorithm):
     geldiğinde mevcut process hemen preempt edilir.
     """
 
-    def __init__(self, aging_interval: Optional[int] = 10) -> None:
+    def __init__(self, aging_interval: int | None = 10) -> None:
         if aging_interval is not None and aging_interval <= 0:
             raise ValueError(f"aging_interval pozitif olmalı, verildi: {aging_interval}")
         self.aging_interval = aging_interval
@@ -88,16 +87,16 @@ class PreemptivePriority(SchedulingAlgorithm):
         self,
         ready_queue: deque[Process],
         current_tick: int,
-    ) -> Optional[Process]:
+    ) -> Process | None:
         if not ready_queue:
             return None
         return min(ready_queue, key=lambda p: (p.priority, p.arrival_time))
 
     def on_tick(
         self,
-        current_process: Optional[Process],
+        current_process: Process | None,
         current_tick: int,
-        ready_queue: Optional[deque[Process]] = None,
+        ready_queue: deque[Process] | None = None,
     ) -> bool:
         """
         Ready queue'da daha yüksek öncelikli process varsa preempt et.

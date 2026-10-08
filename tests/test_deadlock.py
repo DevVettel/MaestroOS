@@ -4,10 +4,8 @@ Hafta 8 testleri — Deadlock Detection & Avoidance.
 Çalıştır: PYTHONPATH=. pytest tests/test_deadlock.py -v
 """
 
-import pytest
 
 from core.deadlock import BankersAlgorithm, Resource, ResourceAllocationGraph
-
 
 # ===========================================================================
 # Resource dataclass testleri

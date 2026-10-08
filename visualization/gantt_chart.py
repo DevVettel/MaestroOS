@@ -1,11 +1,11 @@
 try:
     import pygame
-    import pygame.font
     import pygame.draw
+    import pygame.font
 except ImportError:
     raise ImportError(
         "pygame is required for visualization. Install with: pip install pygame"
-    )
+    ) from None
 
 _PALETTE = [
     (220,  80,  80),

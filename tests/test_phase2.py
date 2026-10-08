@@ -6,12 +6,11 @@ Hafta 2 testleri — SJF, SRTF, Round Robin, Priority Scheduling.
 
 import pytest
 
+from algorithms.scheduling.priority import PreemptivePriority, PriorityScheduling
+from algorithms.scheduling.round_robin import RoundRobin
+from algorithms.scheduling.sjf import SJF, SRTF
 from core.process import Process, ProcessState
 from core.scheduler import Scheduler
-from algorithms.scheduling.sjf import SJF, SRTF
-from algorithms.scheduling.round_robin import RoundRobin
-from algorithms.scheduling.priority import PriorityScheduling, PreemptivePriority
-
 
 # ---------------------------------------------------------------------------
 # Helpers

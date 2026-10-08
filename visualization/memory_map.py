@@ -1,11 +1,11 @@
 try:
     import pygame
-    import pygame.font
     import pygame.draw
+    import pygame.font
 except ImportError:
     raise ImportError(
         "pygame is required for visualization. Install with: pip install pygame"
-    )
+    ) from None
 
 _BG = (28, 28, 38)
 _FREE = (60, 180, 80)

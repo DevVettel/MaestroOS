@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
 
 
 class ProcessState(Enum):
@@ -53,9 +52,9 @@ class Process:
     remaining_time: int = field(init=False)
     waiting_time: int = field(default=0, init=False)
     turnaround_time: int = field(default=0, init=False)
-    completion_time: Optional[int] = field(default=None, init=False)
-    start_time: Optional[int] = field(default=None, init=False)
-    response_time: Optional[int] = field(default=None, init=False)
+    completion_time: int | None = field(default=None, init=False)
+    start_time: int | None = field(default=None, init=False)
+    response_time: int | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if self.burst_time <= 0:

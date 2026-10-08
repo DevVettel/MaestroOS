@@ -1,4 +1,4 @@
-from .scenario import ScenarioConfig, ProcessConfig, save_scenario, load_scenario
+from .scenario import ProcessConfig, ScenarioConfig, load_scenario, save_scenario
 
 __all__ = [
     "ScenarioConfig", "ProcessConfig", "save_scenario", "load_scenario",

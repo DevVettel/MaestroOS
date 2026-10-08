@@ -6,11 +6,10 @@ Faz 1 unit testleri — Process, Clock, Scheduler, FCFS.
 
 import pytest
 
+from algorithms.scheduling.fcfs import FCFS
 from core.clock import SimulationClock
 from core.process import Process, ProcessState
-from core.scheduler import Scheduler, SchedulerStats
-from algorithms.scheduling.fcfs import FCFS
-
+from core.scheduler import Scheduler
 
 # ---------------------------------------------------------------------------
 # Process testleri

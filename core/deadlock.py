@@ -8,9 +8,7 @@ Deadlock Detection & Avoidance — Hafta 8.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
-
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Resource dataclass
@@ -300,7 +298,7 @@ class BankersAlgorithm:
         """
         return self.find_safe_sequence() is not None
 
-    def find_safe_sequence(self) -> Optional[list[int]]:
+    def find_safe_sequence(self) -> list[int] | None:
         """
         Banker's Safety Algorithm: güvenli bir yürütme sırası bulur.
 

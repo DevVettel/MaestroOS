@@ -11,7 +11,6 @@ Optimal quantum: CPU burst time'larının ortalamasına yakın seçilmeli.
 from __future__ import annotations
 
 from collections import deque
-from typing import Optional
 
 from core.process import Process
 from core.scheduler import SchedulingAlgorithm
@@ -35,7 +34,7 @@ class RoundRobin(SchedulingAlgorithm):
         self,
         ready_queue: deque[Process],
         current_tick: int,
-    ) -> Optional[Process]:
+    ) -> Process | None:
         if not ready_queue:
             return None
         # FIFO — kim önce geldiyse o çalışır
@@ -45,9 +44,9 @@ class RoundRobin(SchedulingAlgorithm):
 
     def on_tick(
         self,
-        current_process: Optional[Process],
+        current_process: Process | None,
         current_tick: int,
-        ready_queue: Optional[deque[Process]] = None,
+        ready_queue: deque[Process] | None = None,
     ) -> bool:
         """
         Quantum doldu mu kontrol et.

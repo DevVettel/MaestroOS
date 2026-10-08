@@ -12,7 +12,6 @@ algoritmalar bu sınıftan türetilir ve birbirinin yerine geçebilir.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional
 
 
 class PageReplacementAlgorithm(ABC):
@@ -40,7 +39,7 @@ class PageReplacementAlgorithm(ABC):
         self,
         occupied_frames: dict[int, tuple[int, int]],
         tick: int,
-        future_refs: Optional[list[tuple[int, int]]] = None,
+        future_refs: list[tuple[int, int]] | None = None,
     ) -> int:
         """
         Evict edilecek frame numarasını seç ve döndür.

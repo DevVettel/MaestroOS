@@ -9,7 +9,6 @@ numaralarına eşler. TLB, bu eşlemenin sık erişilen kısmını önbelleğe a
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 class PageFault(Exception):
@@ -83,7 +82,7 @@ class PageTable:
         entry.referenced = True
         return entry.frame_number * self.page_size
 
-    def get_entry(self, page_number: int) -> Optional[PageTableEntry]:
+    def get_entry(self, page_number: int) -> PageTableEntry | None:
         """PTE'yi döndür; sayfa tabloda yoksa None."""
         return self._entries.get(page_number)
 
@@ -116,7 +115,7 @@ class TLB:
         self._hits: int = 0
         self._misses: int = 0
 
-    def lookup(self, page_number: int) -> Optional[int]:
+    def lookup(self, page_number: int) -> int | None:
         """
         TLB'de sayfa numarasını ara.
 

@@ -7,8 +7,6 @@ Temporal locality'e göre iyi davranır; her erişimde metadata güncellenir.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from algorithms.memory.page_replacement import PageReplacementAlgorithm
 
 
@@ -35,7 +33,7 @@ class LRU(PageReplacementAlgorithm):
         self,
         occupied_frames: dict[int, tuple[int, int]],
         tick: int,
-        future_refs: Optional[list[tuple[int, int]]] = None,
+        future_refs: list[tuple[int, int]] | None = None,
     ) -> int:
         """Son erişim zamanı en eski olan frame'i döndür."""
         candidates = {f: self._last_used.get(f, 0) for f in occupied_frames}

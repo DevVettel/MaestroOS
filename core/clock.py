@@ -7,7 +7,7 @@ Tüm modüller (scheduler, memory manager) bu clock'a göre
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 
 class SimulationClock:

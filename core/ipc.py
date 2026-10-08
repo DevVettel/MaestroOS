@@ -15,8 +15,7 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any, Optional
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Pipe
@@ -74,7 +73,7 @@ class Pipe:
     # Read ucu
     # ------------------------------------------------------------------
 
-    def read(self) -> Optional[bytes]:
+    def read(self) -> bytes | None:
         """
         Pipe'tan bir eleman okur.
 
@@ -174,7 +173,7 @@ class MessageQueue:
             self._queue.append(msg)
         self._sequence += 1
 
-    def receive(self) -> Optional[Message]:
+    def receive(self) -> Message | None:
         """
         En yüksek öncelikli mesajı kuyruktan çıkarır.
 
@@ -185,7 +184,7 @@ class MessageQueue:
             return None
         return self._queue.pop(0)
 
-    def peek(self) -> Optional[Message]:
+    def peek(self) -> Message | None:
         """Kuyruktaki ilk mesajı çıkarmadan döner."""
         return self._queue[0] if self._queue else None
 
@@ -239,7 +238,7 @@ class Semaphore:
             self._waiting.append(pid)
         return False
 
-    def signal(self) -> Optional[int]:
+    def signal(self) -> int | None:
         """
         V (verhogen) operasyonu: değeri artır ya da bekleyen process'i uyandır.
 
@@ -285,7 +284,7 @@ class Mutex:
 
     def __init__(self, name: str = "mutex") -> None:
         self.name = name
-        self._owner: Optional[int] = None  # Kilidi tutan process PID
+        self._owner: int | None = None  # Kilidi tutan process PID
         self._waiting: deque[int] = deque()
 
     def acquire(self, pid: int) -> bool:
@@ -304,7 +303,7 @@ class Mutex:
         self._waiting.append(pid)
         return False
 
-    def release(self, pid: int) -> Optional[int]:
+    def release(self, pid: int) -> int | None:
         """
         Kilidi serbest bırakır.
 
@@ -332,7 +331,7 @@ class Mutex:
         return self._owner is not None
 
     @property
-    def owner(self) -> Optional[int]:
+    def owner(self) -> int | None:
         return self._owner
 
     @property
@@ -363,7 +362,7 @@ class ConditionVariable:
         """Process'i bekleme kuyruğuna ekler."""
         self._waiting.append(pid)
 
-    def notify(self) -> Optional[int]:
+    def notify(self) -> int | None:
         """Tek bir bekleyen process'i uyandırır."""
         if self._waiting:
             return self._waiting.popleft()
@@ -409,7 +408,7 @@ class Monitor:
         """Monitor'e girmeye çalışır (mutex acquire)."""
         return self.mutex.acquire(pid)
 
-    def exit(self, pid: int) -> Optional[int]:
+    def exit(self, pid: int) -> int | None:
         """Monitor'den çıkar (mutex release)."""
         return self.mutex.release(pid)
 
@@ -580,7 +579,7 @@ class ReadersWriters:
             self._waiting_writers.append(pid)
         return acquired
 
-    def end_write(self, pid: int) -> Optional[int]:
+    def end_write(self, pid: int) -> int | None:
         """
         Writer exclusive erişimi bırakır.
 

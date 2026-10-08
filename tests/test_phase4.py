@@ -6,12 +6,11 @@ Hafta 4 testleri — Paging & Virtual Memory.
 
 import pytest
 
-from core.paging import PageFault, PageTable, PageTableEntry, TLB
-from core.virtual_memory import VirtualMemoryManager
 from algorithms.memory.fifo import FIFO
 from algorithms.memory.lru import LRU
 from algorithms.memory.optimal import Optimal
-
+from core.paging import TLB, PageFault, PageTable, PageTableEntry
+from core.virtual_memory import VirtualMemoryManager
 
 # ---------------------------------------------------------------------------
 # PageTableEntry

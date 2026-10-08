@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 import threading
-from typing import Optional
+from typing import Any
 
 try:
     import pygame
     import pygame.display
+    import pygame.draw
     import pygame.event
     import pygame.font
     import pygame.time
-    import pygame.draw
 except ImportError:
     raise ImportError(
         "pygame is required for visualization. Install with: pip install pygame"
-    )
+    ) from None
 
 from core.process import ProcessState
 from core.scheduler import SchedulerStats
+
 from .gantt_chart import GanttChart
 from .memory_map import MemoryMapView
 from .stats_dashboard import StatsDashboard
@@ -60,7 +61,7 @@ class SimulationBridge:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._start_payload: Optional[tuple] = None  # (processes, scheduler, memory)
+        self._start_payload: tuple | None = None  # (processes, scheduler, memory)
         self._reset_requested = False
         self._quit_requested = False
         self._paused = False
@@ -94,7 +95,7 @@ class SimulationBridge:
 
     # --- pop side (pygame thread) ---
 
-    def pop_start(self) -> Optional[tuple]:
+    def pop_start(self) -> tuple | None:
         with self._lock:
             payload = self._start_payload
             self._start_payload = None
@@ -248,9 +249,9 @@ class MainWindow:
         font_lg = pygame.font.SysFont("monospace", 18, bold=True)
 
         # Simulation state — None means waiting for start
-        processes = None
-        scheduler = None
-        memory_manager = None
+        processes: Any = None
+        scheduler: Any = None
+        memory_manager: Any = None
         tick = 0
         cpu_busy = 0
         allocated: set = set()
@@ -372,10 +373,10 @@ class MainWindow:
 
 
 if __name__ == "__main__":
+    from algorithms.scheduling.round_robin import RoundRobin
+    from core.memory_manager import AllocationStrategy, MemoryManager
     from core.process import Process
     from core.scheduler import Scheduler
-    from core.memory_manager import MemoryManager, AllocationStrategy
-    from algorithms.scheduling.round_robin import RoundRobin
 
     processes = [
         Process(pid=1, name="Chrome",  burst_time=15, arrival_time=0, priority=2),

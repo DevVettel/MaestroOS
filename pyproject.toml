@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "maestroos"
+version = "0.1.0"
+description = "Gerçek zamanlı görselleştirmeli, saf Python işletim sistemi simülatörü"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11"
+dependencies = [
+    "pygame>=2.5",
+    "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+maestroos = "main:main"
+
+[tool.setuptools]
+py-modules = ["main"]
+
+[tool.setuptools.packages.find]
+include = ["core*", "algorithms*", "visualization*"]
+namespaces = true
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.coverage.run]
+source = ["core", "algorithms", "visualization"]
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+extend-exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = [
+    "E741",  # l / O gibi tek harfli değişkenler algoritma kodunda yaygın
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E402"]  # SDL_VIDEODRIVER, pygame importundan önce ayarlanmalı
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.11"
+files = ["core", "algorithms", "visualization", "main.py"]
+namespace_packages = true
+explicit_package_bases = true
+ignore_missing_imports = true
+warn_unused_ignores = true

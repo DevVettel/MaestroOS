@@ -10,7 +10,6 @@ Dezavantaj: Convoy effect — uzun bir process, kısa olanları bekletir.
 from __future__ import annotations
 
 from collections import deque
-from typing import Optional
 
 from core.process import Process
 from core.scheduler import SchedulingAlgorithm
@@ -28,16 +27,16 @@ class FCFS(SchedulingAlgorithm):
         self,
         ready_queue: deque[Process],
         current_tick: int,
-    ) -> Optional[Process]:
+    ) -> Process | None:
         if not ready_queue:
             return None
         # FIFO — queue'nun başı zaten en eskisi
         return ready_queue[0]
 
     def on_tick(
-            self, 
-            current_process, 
-            current_tick, 
+            self,
+            current_process,
+            current_tick,
             ready_queue=None
         ) -> bool:
         # Non-preemptive: asla preempt etme

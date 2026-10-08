@@ -5,8 +5,9 @@ tkinter Kontrol Paneli — simülasyon parametrelerini yapılandır, senaryo kay
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, Optional
+from typing import cast
 
 try:
     import tkinter as tk
@@ -17,8 +18,10 @@ except ImportError:
 
 from .scenario import (
     BUILTIN_SCENARIOS,
+    AlgorithmName,
     ProcessConfig,
     ScenarioConfig,
+    StrategyName,
     build_simulation,
     load_scenario,
     random_scenario,
@@ -45,7 +48,7 @@ _EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 # Style helper
 # ---------------------------------------------------------------------------
 
-def _apply_dark_style(root: "tk.Tk") -> "ttk.Style":
+def _apply_dark_style(root: tk.Tk) -> ttk.Style:
     style = ttk.Style(root)
     style.theme_use("clam")
 
@@ -102,7 +105,7 @@ class _ProcessTable(ttk.Frame):
     _HEADS = ("PID", "Ad", "Burst", "Arrival", "Priority")
     _WIDTHS = (40, 90, 60, 60, 65)
 
-    def __init__(self, parent: "tk.Widget") -> None:
+    def __init__(self, parent: tk.Widget) -> None:
         super().__init__(parent)
         self._build()
 
@@ -117,7 +120,7 @@ class _ProcessTable(ttk.Frame):
         scroll.pack(side="right", fill="y")
         self._tree.pack(side="left", fill="both", expand=True)
 
-        for col, head, w in zip(self._COLS, self._HEADS, self._WIDTHS):
+        for col, head, w in zip(self._COLS, self._HEADS, self._WIDTHS, strict=True):
             self._tree.heading(col, text=head)
             self._tree.column(col, width=w, anchor="center")
 
@@ -125,13 +128,13 @@ class _ProcessTable(ttk.Frame):
         ef.pack(fill="x", pady=(6, 0))
 
         labels = ["Ad:", "Burst:", "Arrival:", "Priority:"]
-        self._vars: dict[str, "tk.StringVar"] = {
+        self._vars: dict[str, tk.StringVar] = {
             "name":    tk.StringVar(value="P"),
             "burst":   tk.StringVar(value="5"),
             "arrival": tk.StringVar(value="0"),
             "priority":tk.StringVar(value="1"),
         }
-        for i, (lbl, key) in enumerate(zip(labels, self._vars)):
+        for i, (lbl, key) in enumerate(zip(labels, self._vars, strict=True)):
             ttk.Label(ef, text=lbl).grid(row=0, column=i*2, padx=(8,2), pady=4, sticky="e")
             ttk.Entry(ef, textvariable=self._vars[key], width=8).grid(
                 row=0, column=i*2+1, padx=(0,6), pady=4)
@@ -188,7 +191,7 @@ class _ProcessTable(ttk.Frame):
         sel = self._tree.selection()
         if not sel:
             return
-        _, name, burst, arrival, priority = self._tree.item(sel[0], "values")
+        _, name, burst, arrival, priority = tuple(self._tree.item(sel[0], "values"))
         self._vars["name"].set(name)
         self._vars["burst"].set(burst)
         self._vars["arrival"].set(arrival)
@@ -199,7 +202,7 @@ class _ProcessTable(ttk.Frame):
     def get_processes(self) -> list[ProcessConfig]:
         result = []
         for item in self._tree.get_children():
-            pid, name, burst, arrival, priority = self._tree.item(item, "values")
+            pid, name, burst, arrival, priority = tuple(self._tree.item(item, "values"))
             result.append(ProcessConfig(
                 pid=int(pid), name=str(name),
                 burst_time=int(burst), arrival_time=int(arrival), priority=int(priority),
@@ -239,15 +242,15 @@ class ControlPanel:
         panel.close()
     """
 
-    def __init__(self, initial: Optional[ScenarioConfig] = None) -> None:
-        self._result: Optional[ScenarioConfig] = None
+    def __init__(self, initial: ScenarioConfig | None = None) -> None:
+        self._result: ScenarioConfig | None = None
         self._sim_running = False
         self._paused = False
 
-        self._on_start_cb:        Optional[Callable] = None
-        self._on_pause_cb:        Optional[Callable] = None
-        self._on_reset_cb:        Optional[Callable] = None
-        self._on_speed_change_cb: Optional[Callable] = None
+        self._on_start_cb:        Callable | None = None
+        self._on_pause_cb:        Callable | None = None
+        self._on_reset_cb:        Callable | None = None
+        self._on_speed_change_cb: Callable | None = None
 
         self._root = tk.Tk()
         self._root.title("MaestroOS — Kontrol Paneli")
@@ -305,7 +308,7 @@ class ControlPanel:
         self._build_speed_frame(root)
         self._build_button_row(root)
 
-    def _build_process_tab(self, nb: "ttk.Notebook", cfg: ScenarioConfig) -> None:
+    def _build_process_tab(self, nb: ttk.Notebook, cfg: ScenarioConfig) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Processler  ")
         self._proc_table = _ProcessTable(frame)
@@ -313,7 +316,7 @@ class ControlPanel:
         if cfg.processes:
             self._proc_table.load_processes(cfg.processes)
 
-    def _build_scheduler_tab(self, nb: "ttk.Notebook", cfg: ScenarioConfig) -> None:
+    def _build_scheduler_tab(self, nb: ttk.Notebook, cfg: ScenarioConfig) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Zamanlayıcı  ")
 
@@ -339,7 +342,7 @@ class ControlPanel:
             row=2, column=0, columnspan=2, padx=12, pady=(0, 8), sticky="w")
         self._update_algo_desc()
 
-    def _build_memory_tab(self, nb: "ttk.Notebook", cfg: ScenarioConfig) -> None:
+    def _build_memory_tab(self, nb: ttk.Notebook, cfg: ScenarioConfig) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Bellek  ")
 
@@ -368,7 +371,7 @@ class ControlPanel:
                       foreground="#6c7086").grid(
                 row=2 + i, column=0, columnspan=2, padx=12, pady=1, sticky="w")
 
-    def _build_scenario_tab(self, nb: "ttk.Notebook") -> None:
+    def _build_scenario_tab(self, nb: ttk.Notebook) -> None:
         frame = ttk.Frame(nb)
         nb.add(frame, text="  Senaryolar  ")
 
@@ -397,7 +400,7 @@ class ControlPanel:
                          foreground="#6c7086")
         info.pack(padx=16, pady=8, anchor="w")
 
-    def _build_speed_frame(self, root: "tk.Tk") -> None:
+    def _build_speed_frame(self, root: tk.Tk) -> None:
         sf = ttk.LabelFrame(root, text=" Simülasyon Hızı ")
         sf.pack(fill="x", padx=16, pady=(2, 4))
 
@@ -412,7 +415,7 @@ class ControlPanel:
         ttk.Label(sf, textvariable=self._speed_label_var, width=10).pack(
             side="left", padx=(4, 8), pady=6)
 
-    def _build_button_row(self, root: "tk.Tk") -> None:
+    def _build_button_row(self, root: tk.Tk) -> None:
         btn_frame = ttk.Frame(root)
         btn_frame.pack(fill="x", padx=16, pady=(4, 12))
 
@@ -518,7 +521,7 @@ class ControlPanel:
             except Exception as exc:
                 messagebox.showerror("Hata", f"Senaryo yüklenemedi:\n{exc}")
 
-    def _collect_config(self) -> Optional[ScenarioConfig]:
+    def _collect_config(self) -> ScenarioConfig | None:
         procs = self._proc_table.get_processes()
         if not procs:
             messagebox.showwarning("Uyarı", "En az 1 process ekleyin.")
@@ -526,10 +529,10 @@ class ControlPanel:
         return ScenarioConfig(
             name=self._scenario_name.get().strip() or "Senaryo",
             processes=procs,
-            algorithm=self._algo_var.get(),
+            algorithm=cast(AlgorithmName, self._algo_var.get()),
             quantum=self._quantum_var.get(),
             memory_size=self._mem_size_var.get(),
-            memory_strategy=self._strategy_var.get(),
+            memory_strategy=cast(StrategyName, self._strategy_var.get()),
         )
 
     def _start(self) -> None:
@@ -560,7 +563,7 @@ class ControlPanel:
     # Run modes
     # ------------------------------------------------------------------
 
-    def run(self) -> Optional[ScenarioConfig]:
+    def run(self) -> ScenarioConfig | None:
         """Modal mode — blocks until user clicks Başlat or closes window."""
         self._root.mainloop()
         return self._result

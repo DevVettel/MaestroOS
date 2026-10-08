@@ -4,12 +4,13 @@ try:
 except ImportError:
     raise ImportError(
         "pygame is required for visualization. Install with: pip install pygame"
-    )
+    ) from None
 
 import matplotlib
+
 matplotlib.use("Agg")
-from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.figure import Figure
 
 _BG_HEX = "#1c1c26"
 _FG = "#c8c8dc"
